@@ -1,0 +1,12 @@
+{
+  "name": "pk-cloud-server",
+  "version": "1.0.0",
+  "description": "PK Bot Cloud Server powered by Claude AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
