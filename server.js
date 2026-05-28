@@ -1,15 +1,8 @@
-// =============================================
-//  PK BOT — Cloud Server
-//  Runs on Railway 24/7
-//  Powered by Claude AI (Anthropic)
-// =============================================
-
 const http = require('http');
 const https = require('https');
 const url = require('url');
 
 const PORT = process.env.PORT || 3001;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const SYSTEM_PROMPT = `You are PK — an extraordinarily intelligent AI assistant, website manager, and security guard.
 You have THREE roles:
@@ -24,7 +17,7 @@ function setCORS(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function callClaude(messages) {
+function callClaude(messages, apiKey) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -39,7 +32,7 @@ function callClaude(messages) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'Content-Length': Buffer.byteLength(body)
       }
@@ -51,9 +44,13 @@ function callClaude(messages) {
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          resolve(parsed.content?.[0]?.text || 'Sorry, I had trouble responding.');
+          if (parsed.error) {
+            reject(new Error(parsed.error.message));
+          } else {
+            resolve(parsed.content?.[0]?.text || 'Sorry, I had trouble responding.');
+          }
         } catch(e) {
-          reject(e);
+          reject(new Error('Failed to parse response: ' + data.substring(0, 200)));
         }
       });
     });
@@ -75,23 +72,33 @@ const server = http.createServer((req, res) => {
 
   const parsed = url.parse(req.url, true);
 
-  // Status check
   if (parsed.pathname === '/' || parsed.pathname === '/status') {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, status: 'PK Cloud Server running', ai: 'Claude Sonnet' }));
+    res.end(JSON.stringify({ 
+      success: true, 
+      status: 'PK Cloud Server running',
+      ai: 'Claude Sonnet',
+      hasKey: !!apiKey,
+      keyPreview: apiKey ? apiKey.substring(0, 10) + '...' : 'NOT SET'
+    }));
     return;
   }
 
-  // Chat endpoint
   if (parsed.pathname === '/chat' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'ANTHROPIC_API_KEY environment variable is not set on the server.' }));
+          return;
+        }
         const { messages } = JSON.parse(body);
         if (!messages) throw new Error('No messages provided');
-        if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
-        const reply = await callClaude(messages);
+        const reply = await callClaude(messages, apiKey);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, reply }));
       } catch(e) {
@@ -107,6 +114,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   console.log(`PK Cloud Server running on port ${PORT}`);
-  console.log(`AI: Claude Sonnet`);
+  console.log(`API Key: ${apiKey ? 'SET (' + apiKey.substring(0,10) + '...)' : 'NOT SET - please add ANTHROPIC_API_KEY variable'}`);
 });
