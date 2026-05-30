@@ -1,10 +1,13 @@
 {
-  "name": "pk-cloud-server",
+  "name": "pk-master-server",
   "version": "1.0.0",
-  "description": "PK Bot Cloud Server powered by Claude AI",
+  "description": "PK Bot Master Server — Claude AI + Discord + GitHub",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.0.0"
   },
   "engines": {
     "node": "20.x"
